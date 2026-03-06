@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Activity, Package, ListChecks, Bot, PlayCircle } from 'lucide-react';
+import { Activity, Package, ListChecks, Bot, PlayCircle, RefreshCw } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,6 +26,7 @@ export function HomePage() {
   });
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sdk = useMemo(() => {
     try {
@@ -39,42 +40,57 @@ export function HomePage() {
     if (!sdk) return null;
     return new JobsService(sdk);
   }, [sdk]);
-  useEffect(() => {
-    async function fetchDashboardData() {
-      if (!jobsService) {
-        setError('SDK not initialized. Please authenticate.');
-        setLoading(false);
-        return;
-      }
-      try {
-        setLoading(true);
-        setError(null);
-        const jobsResponse = await jobsService.getJobs({
-          $top: 10,
-          $orderby: 'StartTime desc'
-        });
-        if (jobsResponse?.value) {
-          setRecentJobs(jobsResponse.value);
-          const activeJobsCount = jobsResponse.value.filter(
-            j => j.State === 'Running' || j.State === 'Pending'
-          ).length;
-          setMetrics(prev => ({
-            ...prev,
-            activeJobs: activeJobsCount,
-            totalProcesses: 12,
-            queueItems: 45,
-            robotsOnline: 8
-          }));
-        }
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        setError('Failed to load dashboard data');
-        setLoading(false);
-        toast.error('Failed to load dashboard data');
-      }
+  const fetchDashboardData = async (isRefresh = false) => {
+    if (!jobsService) {
+      setError('SDK not initialized. Please check your configuration.');
+      setLoading(false);
+      return;
     }
-    fetchDashboardData();
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+      const jobsResponse = await jobsService.getJobs({
+        $top: 10,
+        $orderby: 'StartTime desc'
+      });
+      if (jobsResponse?.value) {
+        setRecentJobs(jobsResponse.value);
+        const activeJobsCount = jobsResponse.value.filter(
+          j => j.State === 'Running' || j.State === 'Pending'
+        ).length;
+        setMetrics(prev => ({
+          ...prev,
+          activeJobs: activeJobsCount,
+          totalProcesses: 12,
+          queueItems: 45,
+          robotsOnline: 8
+        }));
+      }
+      if (isRefresh) {
+        toast.success('Dashboard refreshed successfully');
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load dashboard data';
+      setError(errorMessage);
+      if (isRefresh) {
+        toast.error('Failed to refresh dashboard');
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+  useEffect(() => {
+    if (jobsService) {
+      fetchDashboardData();
+      const interval = setInterval(() => fetchDashboardData(true), 60000);
+      return () => clearInterval(interval);
+    }
   }, [jobsService]);
   const getStatusBadge = (state: string) => {
     const variants: Record<string, { className: string }> = {
@@ -114,16 +130,30 @@ export function HomePage() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="py-8 md:py-10 lg:py-12">
-          <Card className="p-6 border border-red-200 bg-red-50">
-            <p className="text-sm text-red-800">{error}</p>
-            <Button 
-              onClick={() => window.location.reload()} 
-              variant="outline" 
-              size="sm" 
-              className="mt-4"
-            >
-              Retry
-            </Button>
+          <Card className="p-8 border border-red-200 bg-red-50">
+            <div className="text-center space-y-4">
+              <div className="text-4xl">⚠️</div>
+              <h3 className="text-lg font-semibold text-red-900">Unable to Load Dashboard</h3>
+              <p className="text-sm text-red-800">{error}</p>
+              <div className="flex gap-3 justify-center">
+                <Button 
+                  onClick={() => fetchDashboardData()} 
+                  variant="outline" 
+                  size="sm"
+                  className="border-red-300 hover:bg-red-100"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry
+                </Button>
+                <Button 
+                  onClick={() => window.location.reload()} 
+                  size="sm"
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Reload Page
+                </Button>
+              </div>
+            </div>
           </Card>
         </div>
       </div>
@@ -133,12 +163,24 @@ export function HomePage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
         <div className="space-y-6">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Orchestrator Dashboard</h1>
-            <p className="text-sm text-gray-500 mt-1">Overview of your UiPath automation environment</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Orchestrator Dashboard</h1>
+              <p className="text-sm text-gray-500 mt-1">Overview of your UiPath automation environment</p>
+            </div>
+            <Button
+              onClick={() => fetchDashboardData(true)}
+              variant="outline"
+              size="sm"
+              disabled={refreshing}
+              className="gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="p-6 border border-gray-200 bg-white hover:shadow-sm transition-shadow">
+            <Card className="p-6 border border-gray-200 bg-white hover:shadow-md transition-all duration-200">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500">Total Processes</p>
@@ -151,13 +193,13 @@ export function HomePage() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="mt-4 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-0"
+                className="mt-4 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-0 w-full justify-start"
                 onClick={() => navigate('/processes')}
               >
                 View all →
               </Button>
             </Card>
-            <Card className="p-6 border border-gray-200 bg-white hover:shadow-sm transition-shadow">
+            <Card className="p-6 border border-gray-200 bg-white hover:shadow-md transition-all duration-200">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500">Active Jobs</p>
@@ -170,13 +212,13 @@ export function HomePage() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="mt-4 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-0"
+                className="mt-4 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-0 w-full justify-start"
                 onClick={() => navigate('/jobs')}
               >
                 View all →
               </Button>
             </Card>
-            <Card className="p-6 border border-gray-200 bg-white hover:shadow-sm transition-shadow">
+            <Card className="p-6 border border-gray-200 bg-white hover:shadow-md transition-all duration-200">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500">Queue Items</p>
@@ -189,13 +231,13 @@ export function HomePage() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="mt-4 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-0"
+                className="mt-4 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-0 w-full justify-start"
                 onClick={() => navigate('/queues')}
               >
                 View all →
               </Button>
             </Card>
-            <Card className="p-6 border border-gray-200 bg-white hover:shadow-sm transition-shadow">
+            <Card className="p-6 border border-gray-200 bg-white hover:shadow-md transition-all duration-200">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500">Robots Online</p>
@@ -208,7 +250,7 @@ export function HomePage() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="mt-4 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-0"
+                className="mt-4 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-0 w-full justify-start"
                 onClick={() => navigate('/robots')}
               >
                 View all →
@@ -244,13 +286,15 @@ export function HomePage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {recentJobs.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-500">
-                        No recent jobs found
+                      <td colSpan={4} className="px-6 py-12 text-center">
+                        <Activity className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-sm text-gray-500">No recent jobs found</p>
+                        <p className="text-xs text-gray-400 mt-1">Jobs will appear here once they start running</p>
                       </td>
                     </tr>
                   ) : (
                     recentJobs.map((job) => (
-                      <tr key={job.Id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={job.Id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => navigate('/jobs')}>
                         <td className="px-6 py-3 text-sm font-medium text-gray-900">
                           {job.Info || job.ReleaseName || 'Unnamed Job'}
                         </td>

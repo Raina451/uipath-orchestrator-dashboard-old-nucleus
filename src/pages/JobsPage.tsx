@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { PlayCircle, Search, Filter } from 'lucide-react';
+import { PlayCircle, Search, Filter, RefreshCw } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ export function JobsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sdk = useMemo(() => {
     try {
@@ -29,38 +30,51 @@ export function JobsPage() {
     if (!sdk) return null;
     return new JobsService(sdk);
   }, [sdk]);
-  useEffect(() => {
-    async function fetchJobs() {
-      if (!jobsService) {
-        setError('SDK not initialized. Please authenticate.');
-        setLoading(false);
-        return;
-      }
-      try {
-        setLoading(true);
-        setError(null);
-        const options: any = {
-          $top: 100,
-          $orderby: 'StartTime desc'
-        };
-        if (statusFilter !== 'all') {
-          options.$filter = `State eq '${statusFilter}'`;
-        }
-        const response = await jobsService.getJobs(options);
-        if (response?.value) {
-          setJobs(response.value);
-        }
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching jobs:', err);
-        setError('Failed to load jobs');
-        setLoading(false);
-        toast.error('Failed to load jobs');
-      }
+  const fetchJobs = async (isRefresh = false) => {
+    if (!jobsService) {
+      setError('SDK not initialized. Please check your configuration.');
+      setLoading(false);
+      return;
     }
-    fetchJobs();
-    const interval = setInterval(fetchJobs, 30000);
-    return () => clearInterval(interval);
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+      const options: any = {
+        $top: 100,
+        $orderby: 'StartTime desc'
+      };
+      if (statusFilter !== 'all') {
+        options.$filter = `State eq '${statusFilter}'`;
+      }
+      const response = await jobsService.getJobs(options);
+      if (response?.value) {
+        setJobs(response.value);
+      }
+      if (isRefresh) {
+        toast.success('Jobs refreshed successfully');
+      }
+    } catch (err) {
+      console.error('Error fetching jobs:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load jobs';
+      setError(errorMessage);
+      if (isRefresh) {
+        toast.error('Failed to refresh jobs');
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+  useEffect(() => {
+    if (jobsService) {
+      fetchJobs();
+      const interval = setInterval(() => fetchJobs(true), 30000);
+      return () => clearInterval(interval);
+    }
   }, [jobsService, statusFilter]);
   const filteredJobs = useMemo(() => {
     if (!searchQuery) return jobs;
@@ -103,16 +117,23 @@ export function JobsPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="py-8 md:py-10 lg:py-12">
-          <Card className="p-6 border border-red-200 bg-red-50">
-            <p className="text-sm text-red-800">{error}</p>
-            <Button 
-              onClick={() => window.location.reload()} 
-              variant="outline" 
-              size="sm" 
-              className="mt-4"
-            >
-              Retry
-            </Button>
+          <Card className="p-8 border border-red-200 bg-red-50">
+            <div className="text-center space-y-4">
+              <div className="text-4xl">⚠️</div>
+              <h3 className="text-lg font-semibold text-red-900">Unable to Load Jobs</h3>
+              <p className="text-sm text-red-800">{error}</p>
+              <div className="flex gap-3 justify-center">
+                <Button 
+                  onClick={() => fetchJobs()} 
+                  variant="outline" 
+                  size="sm"
+                  className="border-red-300 hover:bg-red-100"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry
+                </Button>
+              </div>
+            </div>
           </Card>
         </div>
       </div>
@@ -134,11 +155,14 @@ export function JobsPage() {
                 <p className="text-sm text-gray-500 mt-1">{filteredJobs.length} jobs found</p>
               </div>
               <Button
-                onClick={() => window.location.reload()}
+                onClick={() => fetchJobs(true)}
                 variant="outline"
                 size="sm"
+                disabled={refreshing}
+                className="gap-2"
               >
-                Refresh
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                {refreshing ? 'Refreshing...' : 'Refresh'}
               </Button>
             </div>
           </div>
@@ -188,7 +212,12 @@ export function JobsPage() {
                       <td colSpan={6} className="px-6 py-12 text-center">
                         <PlayCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                         <p className="text-sm text-gray-500">No jobs found</p>
-                        <p className="text-xs text-gray-400 mt-1">Try adjusting your filters</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {statusFilter !== 'all' 
+                            ? `No jobs with status "${statusFilter}"` 
+                            : 'Jobs will appear here once they start running'
+                          }
+                        </p>
                       </td>
                     </tr>
                   ) : (
