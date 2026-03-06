@@ -11,6 +11,9 @@ import '@/index.css';
 import { HomePage } from '@/pages/HomePage';
 import { ProcessesPage } from '@/pages/ProcessesPage';
 import { JobsPage } from '@/pages/JobsPage';
+import { QueuesPage } from '@/pages/QueuesPage';
+import { AssetsPage } from '@/pages/AssetsPage';
+import { RobotsPage } from '@/pages/RobotsPage';
 import { AppLayout } from '@/components/layout/AppLayout';
 function AppRouter() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -65,9 +68,9 @@ function AppRouter() {
         <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
         <Route path="/processes" element={<AppLayout><ProcessesPage /></AppLayout>} />
         <Route path="/jobs" element={<AppLayout><JobsPage /></AppLayout>} />
-        <Route path="/queues" element={<Navigate to="/" replace />} />
-        <Route path="/assets" element={<Navigate to="/" replace />} />
-        <Route path="/robots" element={<Navigate to="/" replace />} />
+        <Route path="/queues" element={<AppLayout><QueuesPage /></AppLayout>} />
+        <Route path="/assets" element={<AppLayout><AssetsPage /></AppLayout>} />
+        <Route path="/robots" element={<AppLayout><RobotsPage /></AppLayout>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster richColors closeButton position="top-right" />
