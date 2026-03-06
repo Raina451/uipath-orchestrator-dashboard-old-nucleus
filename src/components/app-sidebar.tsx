@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { Home, Package, PlayCircle, ListChecks, Key, Bot } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
 import {
@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-export function AppSidebar(): JSX.Element {
+export function AppSidebar(): React.JSX.Element {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
   return (
