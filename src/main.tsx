@@ -3,6 +3,7 @@ enableMapSet();
 import React, { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { getAppBase } from '@uipath/uipath-typescript';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Toaster } from '@/components/ui/sonner';
@@ -62,7 +63,7 @@ function AppRouter() {
     );
   }
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={getAppBase()}>
       <ThemeToggle />
       <Routes>
         <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
