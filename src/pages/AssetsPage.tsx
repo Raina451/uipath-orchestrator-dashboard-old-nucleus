@@ -1,21 +1,15 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Key, Search, Folder, Eye, EyeOff } from 'lucide-react';
+import { Key, Search, Eye, EyeOff } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getUiPath } from '@/lib/uipath';
-import { AssetsService } from '@uipath/uipath-typescript/services/assets';
-import { FoldersService } from '@uipath/uipath-typescript/services/folders';
-import type { AssetDto } from '@uipath/uipath-typescript/services/assets';
-import type { FolderDto } from '@uipath/uipath-typescript/services/folders';
+import { Assets } from '@uipath/uipath-typescript/assets';
 import { toast } from 'sonner';
 export function AssetsPage() {
-  const [assets, setAssets] = useState<AssetDto[]>([]);
-  const [folders, setFolders] = useState<FolderDto[]>([]);
-  const [selectedFolder, setSelectedFolder] = useState<string>('all');
+  const [assets, setAssets] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,27 +24,8 @@ export function AssetsPage() {
   }, []);
   const assetsService = useMemo(() => {
     if (!sdk) return null;
-    return new AssetsService(sdk);
+    return new Assets(sdk);
   }, [sdk]);
-  const foldersService = useMemo(() => {
-    if (!sdk) return null;
-    return new FoldersService(sdk);
-  }, [sdk]);
-  useEffect(() => {
-    async function fetchFolders() {
-      if (!foldersService) return;
-      try {
-        const response = await foldersService.getFolders();
-        if (response?.value) {
-          setFolders(response.value);
-        }
-      } catch (err) {
-        console.error('Error fetching folders:', err);
-        toast.error('Failed to load folders');
-      }
-    }
-    fetchFolders();
-  }, [foldersService]);
   useEffect(() => {
     async function fetchAssets() {
       if (!assetsService) {
@@ -61,16 +36,9 @@ export function AssetsPage() {
       try {
         setLoading(true);
         setError(null);
-        const options: any = {
-          $top: 100,
-          $orderby: 'Name asc'
-        };
-        if (selectedFolder !== 'all') {
-          options.$filter = `OrganizationUnitId eq ${selectedFolder}`;
-        }
-        const response = await assetsService.getAssets(options);
-        if (response?.value) {
-          setAssets(response.value);
+        const response = await assetsService.getAll();
+        if (response) {
+          setAssets(Array.isArray(response) ? response : []);
         }
         setLoading(false);
       } catch (err) {
@@ -81,7 +49,7 @@ export function AssetsPage() {
       }
     }
     fetchAssets();
-  }, [assetsService, selectedFolder]);
+  }, [assetsService]);
   const filteredAssets = useMemo(() => {
     if (!searchQuery) return assets;
     return assets.filter(a => 
@@ -114,7 +82,7 @@ export function AssetsPage() {
   const isCredentialType = (type: string) => {
     return type === 'Credential' || type === 'WindowsCredential';
   };
-  const getDisplayValue = (asset: AssetDto) => {
+  const getDisplayValue = (asset: any) => {
     if (!asset.Id) return 'N/A';
     if (isCredentialType(asset.ValueType || '')) {
       return visibleValues.has(asset.Id) ? asset.StringValue || '••••••••' : '••••••••';
@@ -184,20 +152,6 @@ export function AssetsPage() {
                   className="pl-9 border-gray-300 focus:border-blue-500"
                 />
               </div>
-              <Select value={selectedFolder} onValueChange={setSelectedFolder}>
-                <SelectTrigger className="w-full sm:w-64 border-gray-300">
-                  <Folder className="w-4 h-4 mr-2 text-gray-500" />
-                  <SelectValue placeholder="All folders" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All folders</SelectItem>
-                  {folders.map(folder => (
-                    <SelectItem key={folder.Id} value={folder.Id?.toString() || ''}>
-                      {folder.DisplayName || folder.FullyQualifiedName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </Card>
           <Card className="border border-gray-200 bg-white">
@@ -218,18 +172,18 @@ export function AssetsPage() {
                       <td colSpan={5} className="px-6 py-12 text-center">
                         <Key className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                         <p className="text-sm text-gray-500">No assets found</p>
-                        <p className="text-xs text-gray-400 mt-1">Try adjusting your filters</p>
+                        <p className="text-xs text-gray-400 mt-1">Try adjusting your search</p>
                       </td>
                     </tr>
                   ) : (
-                    filteredAssets.map((asset) => (
-                      <tr key={asset.Id} className="hover:bg-gray-50 transition-colors">
+                    filteredAssets.map((asset, index) => (
+                      <tr key={asset.Id || index} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="p-2 bg-purple-100 rounded-lg">
                               <Key className="w-4 h-4 text-purple-600" />
                             </div>
-                            <span className="text-sm font-medium text-gray-900">{asset.Name}</span>
+                            <span className="text-sm font-medium text-gray-900">{asset.Name || 'Unnamed Asset'}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm">
@@ -246,7 +200,7 @@ export function AssetsPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => toggleValueVisibility(asset.Id!)}
+                              onClick={() => toggleValueVisibility(asset.Id)}
                             >
                               {visibleValues.has(asset.Id) ? (
                                 <EyeOff className="w-4 h-4" />

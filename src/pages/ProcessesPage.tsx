@@ -1,20 +1,14 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Package, Search, Play, Folder } from 'lucide-react';
+import { Package, Search, Play } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getUiPath } from '@/lib/uipath';
-import { ProcessesService } from '@uipath/uipath-typescript/services/processes';
-import { FoldersService } from '@uipath/uipath-typescript/services/folders';
-import type { ReleaseDto } from '@uipath/uipath-typescript/services/processes';
-import type { FolderDto } from '@uipath/uipath-typescript/services/folders';
+import { Processes } from '@uipath/uipath-typescript/processes';
 import { toast } from 'sonner';
 export function ProcessesPage() {
-  const [processes, setProcesses] = useState<ReleaseDto[]>([]);
-  const [folders, setFolders] = useState<FolderDto[]>([]);
-  const [selectedFolder, setSelectedFolder] = useState<string>('all');
+  const [processes, setProcesses] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,27 +22,8 @@ export function ProcessesPage() {
   }, []);
   const processesService = useMemo(() => {
     if (!sdk) return null;
-    return new ProcessesService(sdk);
+    return new Processes(sdk);
   }, [sdk]);
-  const foldersService = useMemo(() => {
-    if (!sdk) return null;
-    return new FoldersService(sdk);
-  }, [sdk]);
-  useEffect(() => {
-    async function fetchFolders() {
-      if (!foldersService) return;
-      try {
-        const response = await foldersService.getFolders();
-        if (response?.value) {
-          setFolders(response.value);
-        }
-      } catch (err) {
-        console.error('Error fetching folders:', err);
-        toast.error('Failed to load folders');
-      }
-    }
-    fetchFolders();
-  }, [foldersService]);
   useEffect(() => {
     async function fetchProcesses() {
       if (!processesService) {
@@ -59,16 +34,9 @@ export function ProcessesPage() {
       try {
         setLoading(true);
         setError(null);
-        const options: any = {
-          $top: 100,
-          $orderby: 'Name asc'
-        };
-        if (selectedFolder !== 'all') {
-          options.$filter = `OrganizationUnitId eq ${selectedFolder}`;
-        }
-        const response = await processesService.getReleases(options);
-        if (response?.value) {
-          setProcesses(response.value);
+        const response = await processesService.getAll();
+        if (response) {
+          setProcesses(Array.isArray(response) ? response : []);
         }
         setLoading(false);
       } catch (err) {
@@ -79,7 +47,7 @@ export function ProcessesPage() {
       }
     }
     fetchProcesses();
-  }, [processesService, selectedFolder]);
+  }, [processesService]);
   const filteredProcesses = useMemo(() => {
     if (!searchQuery) return processes;
     return processes.filter(p => 
@@ -153,20 +121,6 @@ export function ProcessesPage() {
                   className="pl-9 border-gray-300 focus:border-blue-500"
                 />
               </div>
-              <Select value={selectedFolder} onValueChange={setSelectedFolder}>
-                <SelectTrigger className="w-full sm:w-64 border-gray-300">
-                  <Folder className="w-4 h-4 mr-2 text-gray-500" />
-                  <SelectValue placeholder="All folders" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All folders</SelectItem>
-                  {folders.map(folder => (
-                    <SelectItem key={folder.Id} value={folder.Id?.toString() || ''}>
-                      {folder.DisplayName || folder.FullyQualifiedName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </Card>
           <Card className="border border-gray-200 bg-white">
@@ -186,22 +140,22 @@ export function ProcessesPage() {
                       <td colSpan={4} className="px-6 py-12 text-center">
                         <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                         <p className="text-sm text-gray-500">No processes found</p>
-                        <p className="text-xs text-gray-400 mt-1">Try adjusting your filters</p>
+                        <p className="text-xs text-gray-400 mt-1">Try adjusting your search</p>
                       </td>
                     </tr>
                   ) : (
-                    filteredProcesses.map((process) => (
-                      <tr key={process.Key} className="hover:bg-gray-50 transition-colors">
+                    filteredProcesses.map((process, index) => (
+                      <tr key={process.Key || index} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="p-2 bg-blue-100 rounded-lg">
                               <Package className="w-4 h-4 text-blue-600" />
                             </div>
-                            <span className="text-sm font-medium text-gray-900">{process.Name}</span>
+                            <span className="text-sm font-medium text-gray-900">{process.Name || 'Unnamed Process'}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
-                          {process.ProcessVersion || 'N/A'}
+                          {process.ProcessVersion || process.Version || 'N/A'}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
                           {process.Description || 'No description'}
