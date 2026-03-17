@@ -1,6 +1,6 @@
 # UiPath Orchestrator Dashboard
 Professional enterprise dashboard for UiPath Orchestrator with clean table-based layouts, OAuth authentication, and comprehensive resource management capabilities.
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Raina451/uipath-orchestrator-dashboard-old-nucleus)
 ## Overview
 A professional enterprise dashboard application that provides a clean, information-dense interface for viewing and managing UiPath Orchestrator resources. The application features a modern, corporate-appropriate design with neutral color schemes, table-based data displays, and efficient navigation patterns. Built with React, TypeScript, and the UiPath SDK, it offers real-time visibility into Orchestrator entities including processes, queues, assets, jobs, and robots.
 ## Key Features
@@ -106,7 +106,7 @@ Most resources in Orchestrator are folder-scoped. Use the folder selector dropdo
 - Manual refresh available via the Refresh button on each page
 ## Deployment
 ### Deploy to Cloudflare Workers
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Raina451/uipath-orchestrator-dashboard-old-nucleus)
 #### Manual Deployment
 1. Install Wrangler CLI (if not already installed):
 ```bash
